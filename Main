@@ -1,0 +1,215 @@
+{
+  "nbformat": 4,
+  "nbformat_minor": 0,
+  "metadata": {
+    "colab": {
+      "provenance": [],
+      "toc_visible": true,
+      "mount_file_id": "https://gist.github.com/bharathbharathi-a/44ed05065324ed51c09376dd343fc960#file-untitled3-ipynb",
+      "authorship_tag": "ABX9TyPftnMHZ8UZ2OUQ++z/SVaD",
+      "include_colab_link": true
+    },
+    "kernelspec": {
+      "name": "python3",
+      "display_name": "Python 3"
+    },
+    "language_info": {
+      "name": "python"
+    }
+  },
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "view-in-github",
+        "colab_type": "text"
+      },
+      "source": [
+        "<a href=\"https://colab.research.google.com/github/bharathbharathi-a/Gpay-statement-analysiser-/blob/main/Main\" target=\"_parent\"><img src=\"https://colab.research.google.com/assets/colab-badge.svg\" alt=\"Open In Colab\"/></a>"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 2,
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "collapsed": true,
+        "id": "2xgtIIx2tUF6",
+        "outputId": "5267cf66-df6b-4087-a7eb-7aad0a715e36"
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Requirement already satisfied: pdfplumber in /usr/local/lib/python3.12/dist-packages (0.11.9)\n",
+            "Requirement already satisfied: pdfminer.six==20251230 in /usr/local/lib/python3.12/dist-packages (from pdfplumber) (20251230)\n",
+            "Requirement already satisfied: Pillow>=9.1 in /usr/local/lib/python3.12/dist-packages (from pdfplumber) (11.3.0)\n",
+            "Requirement already satisfied: pypdfium2>=4.18.0 in /usr/local/lib/python3.12/dist-packages (from pdfplumber) (5.3.0)\n",
+            "Requirement already satisfied: charset-normalizer>=2.0.0 in /usr/local/lib/python3.12/dist-packages (from pdfminer.six==20251230->pdfplumber) (3.4.4)\n",
+            "Requirement already satisfied: cryptography>=36.0.0 in /usr/local/lib/python3.12/dist-packages (from pdfminer.six==20251230->pdfplumber) (43.0.3)\n",
+            "Requirement already satisfied: cffi>=1.12 in /usr/local/lib/python3.12/dist-packages (from cryptography>=36.0.0->pdfminer.six==20251230->pdfplumber) (2.0.0)\n",
+            "Requirement already satisfied: pycparser in /usr/local/lib/python3.12/dist-packages (from cffi>=1.12->cryptography>=36.0.0->pdfminer.six==20251230->pdfplumber) (2.23)\n"
+          ]
+        }
+      ],
+      "source": [
+        "!pip install pdfplumber\n",
+        "import pdfplumber\n",
+        "import pandas as pd\n",
+        "import re\n",
+        "from datetime import datetime\n",
+        "\n",
+        "def extract_statement_data(pdf_path):\n",
+        "    transactions = []\n",
+        "\n",
+        "    # regex to find dates (Adjust based on your statement format, e.g., DD-MM-YYYY)\n",
+        "    date_pattern = r'\\d{2}[-/]\\d{2}[-/]\\d{4}'\n",
+        "\n",
+        "    with pdfplumber.open(pdf_path) as pdf:\n",
+        "        for page in pdf.pages:\n",
+        "            text = page.extract_text()\n",
+        "            lines = text.split('\\n')\n",
+        "\n",
+        "            for line in lines:\n",
+        "                # Basic logic: Find lines that start with a date\n",
+        "                if re.match(date_pattern, line):\n",
+        "                    # This is a simplified split.\n",
+        "                    # Real statements often need specific column slicing.\n",
+        "                    parts = line.split()\n",
+        "\n",
+        "                    date_str = parts[0]\n",
+        "                    # Attempt to parse date to group by month\n",
+        "                    try:\n",
+        "                        date_obj = datetime.strptime(date_str, '%d-%m-%Y')\n",
+        "                        month_year = date_obj.strftime('%B %Y')\n",
+        "\n",
+        "                        # Example structure: Date, Description, Amount, Account\n",
+        "                        # Note: You may need to adjust the index based on your PDF layout\n",
+        "                        transactions.append({\n",
+        "                            'Date': date_obj,\n",
+        "                            'Month': month_year,\n",
+        "                            'Description': \" \".join(parts[1:-2]),\n",
+        "                            'Amount': parts[-1],\n",
+        "                            'Account': 'Primary Bank' # Or logic to detect account\n",
+        "                        })\n",
+        "                    except ValueError:\n",
+        "                        continue\n",
+        "\n",
+        "    return pd.DataFrame(transactions)\n",
+        "\n",
+        "def segregate_and_save(pdf_file):\n",
+        "    df = extract_statement_data(pdf_file)\n",
+        "\n",
+        "    # 1. Segregate by Account (if multiple)\n",
+        "    accounts = df['Account'].unique()\n",
+        "\n",
+        "    for acc in accounts:\n",
+        "        acc_df = df[df['Account'] == acc]\n",
+        "\n",
+        "        # 2. Segregate by Month\n",
+        "        months = acc_df['Month'].unique()\n",
+        "\n",
+        "        for month in months:\n",
+        "            monthly_df = acc_df[acc_df['Month'] == month]\n",
+        "            filename = f\"Statement_{acc}_{month.replace(' ', '_')}.csv\"\n",
+        "            monthly_df.to_csv(filename, index=False)\n",
+        "            print(f\"Saved: {filename}\")\n",
+        "\n",
+        "# Usage\n",
+        "# segregate_and_save('your_statement.pdf')"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [],
+      "metadata": {
+        "id": "xnXlvns4xtD8"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "from google.colab import drive\n",
+        "drive.mount('/content/drive')"
+      ],
+      "metadata": {
+        "id": "qbbv0eegvuc4",
+        "outputId": "9da66c5e-3a3f-4a4d-e240-abce3ff2cfe7",
+        "colab": {
+          "base_uri": "https://localhost:8080/",
+          "height": 391
+        }
+      },
+      "execution_count": 3,
+      "outputs": [
+        {
+          "output_type": "error",
+          "ename": "MessageError",
+          "evalue": "Error: credential propagation was unsuccessful",
+          "traceback": [
+            "\u001b[0;31m---------------------------------------------------------------------------\u001b[0m",
+            "\u001b[0;31mMessageError\u001b[0m                              Traceback (most recent call last)",
+            "\u001b[0;32m/tmp/ipython-input-1408506528.py\u001b[0m in \u001b[0;36m<cell line: 0>\u001b[0;34m()\u001b[0m\n\u001b[1;32m      1\u001b[0m \u001b[0;32mfrom\u001b[0m \u001b[0mgoogle\u001b[0m\u001b[0;34m.\u001b[0m\u001b[0mcolab\u001b[0m \u001b[0;32mimport\u001b[0m \u001b[0mdrive\u001b[0m\u001b[0;34m\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[0;32m----> 2\u001b[0;31m \u001b[0mdrive\u001b[0m\u001b[0;34m.\u001b[0m\u001b[0mmount\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0;34m'/content/drive'\u001b[0m\u001b[0;34m)\u001b[0m\u001b[0;34m\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[0m",
+            "\u001b[0;32m/usr/local/lib/python3.12/dist-packages/google/colab/drive.py\u001b[0m in \u001b[0;36mmount\u001b[0;34m(mountpoint, force_remount, timeout_ms, readonly)\u001b[0m\n\u001b[1;32m     95\u001b[0m \u001b[0;32mdef\u001b[0m \u001b[0mmount\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0mmountpoint\u001b[0m\u001b[0;34m,\u001b[0m \u001b[0mforce_remount\u001b[0m\u001b[0;34m=\u001b[0m\u001b[0;32mFalse\u001b[0m\u001b[0;34m,\u001b[0m \u001b[0mtimeout_ms\u001b[0m\u001b[0;34m=\u001b[0m\u001b[0;36m120000\u001b[0m\u001b[0;34m,\u001b[0m \u001b[0mreadonly\u001b[0m\u001b[0;34m=\u001b[0m\u001b[0;32mFalse\u001b[0m\u001b[0;34m)\u001b[0m\u001b[0;34m:\u001b[0m\u001b[0;34m\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[1;32m     96\u001b[0m   \u001b[0;34m\"\"\"Mount your Google Drive at the specified mountpoint path.\"\"\"\u001b[0m\u001b[0;34m\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[0;32m---> 97\u001b[0;31m   return _mount(\n\u001b[0m\u001b[1;32m     98\u001b[0m       \u001b[0mmountpoint\u001b[0m\u001b[0;34m,\u001b[0m\u001b[0;34m\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[1;32m     99\u001b[0m       \u001b[0mforce_remount\u001b[0m\u001b[0;34m=\u001b[0m\u001b[0mforce_remount\u001b[0m\u001b[0;34m,\u001b[0m\u001b[0;34m\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n",
+            "\u001b[0;32m/usr/local/lib/python3.12/dist-packages/google/colab/drive.py\u001b[0m in \u001b[0;36m_mount\u001b[0;34m(mountpoint, force_remount, timeout_ms, ephemeral, readonly)\u001b[0m\n\u001b[1;32m    132\u001b[0m   )\n\u001b[1;32m    133\u001b[0m   \u001b[0;32mif\u001b[0m \u001b[0mephemeral\u001b[0m\u001b[0;34m:\u001b[0m\u001b[0;34m\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[0;32m--> 134\u001b[0;31m     _message.blocking_request(\n\u001b[0m\u001b[1;32m    135\u001b[0m         \u001b[0;34m'request_auth'\u001b[0m\u001b[0;34m,\u001b[0m\u001b[0;34m\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[1;32m    136\u001b[0m         \u001b[0mrequest\u001b[0m\u001b[0;34m=\u001b[0m\u001b[0;34m{\u001b[0m\u001b[0;34m'authType'\u001b[0m\u001b[0;34m:\u001b[0m \u001b[0;34m'dfs_ephemeral'\u001b[0m\u001b[0;34m}\u001b[0m\u001b[0;34m,\u001b[0m\u001b[0;34m\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n",
+            "\u001b[0;32m/usr/local/lib/python3.12/dist-packages/google/colab/_message.py\u001b[0m in \u001b[0;36mblocking_request\u001b[0;34m(request_type, request, timeout_sec, parent)\u001b[0m\n\u001b[1;32m    174\u001b[0m       \u001b[0mrequest_type\u001b[0m\u001b[0;34m,\u001b[0m \u001b[0mrequest\u001b[0m\u001b[0;34m,\u001b[0m \u001b[0mparent\u001b[0m\u001b[0;34m=\u001b[0m\u001b[0mparent\u001b[0m\u001b[0;34m,\u001b[0m \u001b[0mexpect_reply\u001b[0m\u001b[0;34m=\u001b[0m\u001b[0;32mTrue\u001b[0m\u001b[0;34m\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[1;32m    175\u001b[0m   )\n\u001b[0;32m--> 176\u001b[0;31m   \u001b[0;32mreturn\u001b[0m \u001b[0mread_reply_from_input\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0mrequest_id\u001b[0m\u001b[0;34m,\u001b[0m \u001b[0mtimeout_sec\u001b[0m\u001b[0;34m)\u001b[0m\u001b[0;34m\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[0m",
+            "\u001b[0;32m/usr/local/lib/python3.12/dist-packages/google/colab/_message.py\u001b[0m in \u001b[0;36mread_reply_from_input\u001b[0;34m(message_id, timeout_sec)\u001b[0m\n\u001b[1;32m    101\u001b[0m     ):\n\u001b[1;32m    102\u001b[0m       \u001b[0;32mif\u001b[0m \u001b[0;34m'error'\u001b[0m \u001b[0;32min\u001b[0m \u001b[0mreply\u001b[0m\u001b[0;34m:\u001b[0m\u001b[0;34m\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[0;32m--> 103\u001b[0;31m         \u001b[0;32mraise\u001b[0m \u001b[0mMessageError\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0mreply\u001b[0m\u001b[0;34m[\u001b[0m\u001b[0;34m'error'\u001b[0m\u001b[0;34m]\u001b[0m\u001b[0;34m)\u001b[0m\u001b[0;34m\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[0m\u001b[1;32m    104\u001b[0m       \u001b[0;32mreturn\u001b[0m \u001b[0mreply\u001b[0m\u001b[0;34m.\u001b[0m\u001b[0mget\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0;34m'data'\u001b[0m\u001b[0;34m,\u001b[0m \u001b[0;32mNone\u001b[0m\u001b[0;34m)\u001b[0m\u001b[0;34m\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[1;32m    105\u001b[0m \u001b[0;34m\u001b[0m\u001b[0m\n",
+            "\u001b[0;31mMessageError\u001b[0m: Error: credential propagation was unsuccessful"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "55bb07aa"
+      },
+      "source": [
+        "import os\n",
+        "\n",
+        "# List all generated CSV files\n",
+        "csv_files = [f for f in os.listdir('.') if f.endswith('.csv')]\n",
+        "if csv_files:\n",
+        "    print(\"Generated CSV files:\")\n",
+        "    for f in csv_files:\n",
+        "        print(f)\n",
+        "else:\n",
+        "    print(\"No CSV files found. Please ensure the 'segregate_and_save' function executed successfully.\")"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "33d56226"
+      },
+      "source": [
+        "### How to Download Your CSV Files:\n",
+        "\n",
+        "1.  **Locate the 'Files' tab:** On the left sidebar of your Google Colab interface, you'll see several icons. Click on the folder icon, which represents the 'Files' browser.\n",
+        "2.  **Find your files:** In the 'Files' pane that opens, you should see the `.csv` files listed (e.g., `Statement_Primary_Bank_Month Year.csv`).\n",
+        "3.  **Download:** To download a file, hover over its name, and a three-dot menu (or right-click) will appear. Click on it and select 'Download'.\n",
+        "\n",
+        "If the files aren't immediately visible, you might need to click the refresh icon (a circular arrow) at the top of the 'Files' pane."
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "dd584a3b"
+      },
+      "source": [
+        "# Call the function to segregate data from 'gpay.pdf' and save as CSVs\n",
+        "segregate_and_save('/content/gpay.pdf')"
+      ],
+      "execution_count": null,
+      "outputs": []
+    }
+  ]
+}
